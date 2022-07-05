@@ -22,6 +22,56 @@ def getAdjacencyMatrix(incidenceMatrix):
         adjacencyMatrix[originNode].append(destinationNode)
     return adjacencyMatrix
 
+def checkForPerfectMatching(incidenceMatrix, A, B, adjacencyMatrixOfG):
+    N = incidenceMatrix.shape[1]
+    adjacencyMatrix = getAdjacencyMatrix(incidenceMatrix)
+    matchings, matched = getMatchings(A, N, adjacencyMatrix)
+
+    if(len(matchings) == N//2):
+        return ([], [], matchings, True, False)
+
+    setBackwardEdges(adjacencyMatrix, matchings)
+    unmatchedNode = getUnmatchedNode(matched)
+
+    edgesAtoB, leafNodes, nodesInA, nodesInB, unfeasible = bfs(adjacencyMatrix, adjacencyMatrixOfG, unmatchedNode, A, B)
+
+    if (unfeasible):
+        return (nodesInA, nodesInB, [], False, True)
+    elif (allLeavesInA(A, leafNodes)):
+        return (nodesInA, nodesInB, [], False, False) 
+    else:
+        return ([], [], edgesAtoB, True, False)
+
+def getMatchings(A, N, adjacencyMatrix):
+    matchings = []
+    matched = np.zeros(N)
+    for i in range(len(A)):
+        originNode = i
+        matching = (originNode, )
+        if matched[i] == 0:
+            for j in range(len(adjacencyMatrix[i])):
+                destinationNode = adjacencyMatrix[i][j]
+                if matched[destinationNode] == 0:
+                    matched[originNode] = 1
+                    matched[destinationNode] = 1
+                    matching += (destinationNode,)
+                    matchings.append(matching)
+                    break
+    return matchings, matched
+
+def setBackwardEdges(adjacencyMatrix, matchings):
+    for i in range(len(matchings)):
+        originNode, destinationNode = matchings[i]
+        adjacencyMatrix[destinationNode].append(originNode)
+
+def getUnmatchedNode(matched):
+    unmatchedNode = -1
+    for i in range(len(matched)):
+        if matched[i] == 0:
+            unmatchedNode = i
+            break
+    return unmatchedNode
+
 def bfs(adjacencyMatrixOfH, adjacencyMatrixOfG, initialNode, A, B):
     N = len(adjacencyMatrixOfH)
 
@@ -65,70 +115,11 @@ def getNeighborsInG(adjacencyMatrix, nodes):
                 visited[adjacencyMatrix[nodes[i]][j]] = 1
     return neighbors
 
-def checkForPerfectMatching(incidenceMatrix, A, B, adjacencyMatrixOfG):
-    """
-    Checks if the graph has a perfect matching.
-    """
-    N = incidenceMatrix.shape[1]
-    adjacencyMatrix = getAdjacencyMatrix(incidenceMatrix)
-    matchings, matched = getMatchings(A, N, adjacencyMatrix)
-    if(len(matchings) == N//2):
-        return ([], [], matchings, True, False)
-    setBackwardEdges(adjacencyMatrix, matchings)
-    unmatchedNode = getUnmatchedNode(matched)
-
-    edgesAtoB, leafNodes, nodesInA, nodesInB, unfeasible = bfs(adjacencyMatrix, adjacencyMatrixOfG, unmatchedNode, A, B)
-
-    if (unfeasible):
-        return (nodesInA, nodesInB, [], False, True)
-    elif (allLeavesInA(A, leafNodes)):
-        return (nodesInA, nodesInB, [], False, False) 
-    else:
-        return ([], [], edgesAtoB, True, False)
-
-def findPathToLeaf(parents, unmatchedNode):
-    path = []
-    while parents[unmatchedNode] != -1:
-        path.append(unmatchedNode)
-        unmatchedNode = parents[unmatchedNode]
-    path.append(unmatchedNode)
-    return path
-
 def allLeavesInA(A, leafNodes):
     for i in range(len(leafNodes)):
         if leafNodes[i] not in A:
             return False
     return True
-
-def setBackwardEdges(adjacencyMatrix, matchings):
-    for i in range(len(matchings)):
-        originNode, destinationNode = matchings[i]
-        adjacencyMatrix[destinationNode].append(originNode)
-
-def getUnmatchedNode(matched):
-    unmatchedNode = -1
-    for i in range(len(matched)):
-        if matched[i] == 0:
-            unmatchedNode = i
-            break
-    return unmatchedNode
-
-def getMatchings(A, N, adjacencyMatrix):
-    matchings = []
-    matched = np.zeros(N)
-    for i in range(len(A)):
-        originNode = i
-        matching = (originNode, )
-        if matched[i] == 0:
-            for j in range(len(adjacencyMatrix[i])):
-                destinationNode = adjacencyMatrix[i][j]
-                if matched[destinationNode] == 0:
-                    matched[originNode] = 1
-                    matched[destinationNode] = 1
-                    matching += (destinationNode,)
-                    matchings.append(matching)
-                    break
-    return matchings, matched
     
 def updateYVector(incidenceMatrix, secondaryGraphEdges, edgeWeights, yVector, S, NHS):
     M = incidenceMatrix.shape[0]
@@ -143,6 +134,38 @@ def updateYVector(incidenceMatrix, secondaryGraphEdges, edgeWeights, yVector, S,
                 epsilon = min(epsilon, edgeWeights[i] - np.dot(edge, yVector))
     yVector[S] += epsilon
     yVector[NHS] -= epsilon
+
+def getEdgesFromIncidenceMatrix(N, M, incidenceMatrix, matching):
+    edges = []
+    for i in range(len(matching)):
+        edge = np.zeros(2 * N)
+        originNode, destinationNode = matching[i]
+        edge[originNode] = 1
+        edge[destinationNode] = 1
+        edges.append(edge)
+    edgesIncidenceMatrix = np.zeros(M)
+    for i in range(M):
+        for j in range(len(edges)):
+            if (incidenceMatrix[i] == edges[j]).all():
+                edgesIncidenceMatrix[i] = 1
+    return edgesIncidenceMatrix
+
+def getCertificate(N, setS, neighborsOfS):
+    certificate = np.zeros(2 * N)
+    for i in range(len(setS)):
+        certificate[setS[i]] = 1
+    for i in range(len(neighborsOfS)):
+        certificate[neighborsOfS[i]] = 1
+    return certificate
+
+def printVector(vector):
+    for i in range(len(vector)):
+        print(int(vector[i]), end=" ")
+    print()
+
+"""
+Calculates the minimum weight matching of a graph.
+"""  
 
 N, M = input().split()
 N = int(N)
@@ -170,33 +193,6 @@ viableWeight = np.min(edgeWeights)/2
 yVector[:] = viableWeight
 
 adjacencyMatrixOfG = getAdjacencyMatrix(incidenceMatrix)
-def printVector(vector):
-    for i in range(len(vector)):
-        print(int(vector[i]), end=" ")
-    print()
-
-def getEdgesFromIncidenceMatrix(N, M, incidenceMatrix, matching):
-    edges = []
-    for i in range(len(matching)):
-        edge = np.zeros(2 * N)
-        originNode, destinationNode = matching[i]
-        edge[originNode] = 1
-        edge[destinationNode] = 1
-        edges.append(edge)
-    edgesIncidenceMatrix = np.zeros(M)
-    for i in range(M):
-        for j in range(len(edges)):
-            if (incidenceMatrix[i] == edges[j]).all():
-                edgesIncidenceMatrix[i] = 1
-    return edgesIncidenceMatrix
-
-def getCertificate(N, setS, neighborsOfS):
-    certificate = np.zeros(2 * N)
-    for i in range(len(setS)):
-        certificate[setS[i]] = 1
-    for i in range(len(neighborsOfS)):
-        certificate[neighborsOfS[i]] = 1
-    return certificate
 
 while True:
     secondaryGraphEdges = []
