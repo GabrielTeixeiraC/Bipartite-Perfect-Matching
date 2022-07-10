@@ -24,27 +24,42 @@ def getAdjacencyMatrix(incidenceMatrix):
 
 def checkForPerfectMatching(incidenceMatrix, A, B, adjacencyMatrixOfG):
     N = incidenceMatrix.shape[1]
-    adjacencyMatrix = getAdjacencyMatrix(incidenceMatrix)
-    matchings, matched = getMatchings(A, N, adjacencyMatrix)
-
-    if(len(matchings) == N//2):
-        return ([], [], matchings, True, False)
-
-    setBackwardEdges(adjacencyMatrix, matchings)
-    unmatchedNode = getUnmatchedNode(matched)
-
-    edgesAtoB, leafNodes, nodesInA, nodesInB, unfeasible = bfs(adjacencyMatrix, adjacencyMatrixOfG, unmatchedNode, A, B)
-
-    if (unfeasible):
-        return (nodesInA, nodesInB, [], False, True)
-    elif (allLeavesInA(A, leafNodes)):
-        return (nodesInA, nodesInB, [], False, False) 
-    else:
-        return ([], [], edgesAtoB, True, False)
-
-def getMatchings(A, N, adjacencyMatrix):
     matchings = []
     matched = np.zeros(N)
+    while len(matchings) != N // 2:
+        adjacencyMatrix = getAdjacencyMatrix(incidenceMatrix)
+        matchings, matched = getMatchings(A, matchings, matched, adjacencyMatrix)
+        unmatchedNode = getUnmatchedNode(matched)
+        setBackwardEdges(adjacencyMatrix, matchings)
+        
+        if len(matchings) == N // 2:
+            break
+
+        edgesAtoB, leafNodes, nodesInA, nodesInB, unfeasible = bfs(adjacencyMatrix, adjacencyMatrixOfG, unmatchedNode, A, B)
+
+        if (unfeasible):
+            return (nodesInA, nodesInB, [], False, True)
+        elif (allLeavesInA(A, leafNodes)):
+            return (nodesInA, nodesInB, [], False, False) 
+        else:
+            matchingsToRemove = []
+            for i in range(len(edgesAtoB)):
+                for j in range(len(matchings)):
+                    if matchings[j][0] == edgesAtoB[i][0]:
+                        matchingsToRemove.append(j)
+                        oldMatch = matchings[j]
+                        matched[oldMatch[1]] = 0
+            matchingsToRemove.sort(reverse=True)
+            for i in range(len(matchingsToRemove)):
+                matchings.pop(matchingsToRemove[i])
+            for i in range(len(edgesAtoB)):
+                newMatch = edgesAtoB[i]
+                matched[newMatch[0]] = 1
+                matched[newMatch[1]] = 1
+            matchings += (edgesAtoB)
+    return ([], [], matchings, True, False)
+
+def getMatchings(A, matchings, matched, adjacencyMatrix):
     for i in range(len(A)):
         originNode = i
         matching = (originNode, )
@@ -81,29 +96,47 @@ def bfs(adjacencyMatrixOfH, adjacencyMatrixOfG, initialNode, A, B):
     visited[initialNode] = 1
 
     edgesAtoB = []
-
+    parents = {}
+    parents[initialNode] = -1
     leafNodes = []
 
     nodesInA = [initialNode]
     nodesInB = []
+
+    Bleaf = -1
     while len(queue) > 0:
         node = queue.pop()
-        if len(adjacencyMatrixOfH[node]) == 0:
-            leafNodes.append(node)
         for i in range(len(adjacencyMatrixOfH[node])):
             adjacentNode = adjacencyMatrixOfH[node][i]
             if visited[adjacentNode] == 0:
                 visited[adjacentNode] = 1
                 queue.append(adjacentNode)
+                parents[adjacentNode] = node
                 if adjacentNode in A:
                     nodesInA.append(adjacentNode)
                 elif adjacentNode in B:
                     nodesInB.append(adjacentNode)
-                    edgesAtoB.append((node, adjacentNode))
+                if len(adjacencyMatrixOfH[adjacentNode]) == 0:
+                    leafNodes.append(adjacentNode)
+                    if (adjacentNode in B):
+                        Bleaf = adjacentNode
+                        break
+
+    findEdgesInPath(B, edgesAtoB, parents, Bleaf)
     neighborsInG = getNeighborsInG(adjacencyMatrixOfG, nodesInA)
     if (len(nodesInA) > len(neighborsInG)):
         return ([], [], nodesInA, neighborsInG, True)
     return (edgesAtoB, leafNodes, nodesInA, nodesInB, False)
+
+def findEdgesInPath(B, edgesAtoB, parents, Bleaf):
+    node = Bleaf
+    while (True):
+        if node == -1:
+            break
+        edge = (parents[node], node)
+        if (edge[1] in B):
+            edgesAtoB.append(edge)
+        node = parents[node]
 
 def getNeighborsInG(adjacencyMatrix, nodes):
     neighbors = []
@@ -189,8 +222,7 @@ edgeWeights = np.array(edgeWeights, dtype=float)
 
 yVector = np.zeros(2 * N)
 
-viableWeight = np.min(edgeWeights)/2
-yVector[:] = viableWeight
+yVector[:] = 0
 
 adjacencyMatrixOfG = getAdjacencyMatrix(incidenceMatrix)
 
