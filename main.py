@@ -42,23 +42,27 @@ def checkForPerfectMatching(incidenceMatrix, A, B, adjacencyMatrixOfG):
         elif (allLeavesInA(A, leafNodes)):
             return (nodesInA, nodesInB, [], False, False) 
         else:
-            matchingsToRemove = []
-            for i in range(len(edgesAtoB)):
-                for j in range(len(matchings)):
-                    if matchings[j][0] == edgesAtoB[i][0]:
-                        matchingsToRemove.append(j)
-                        oldMatch = matchings[j]
-                        matched[oldMatch[1]] = 0
-            matchingsToRemove.sort(reverse=True)
-            for i in range(len(matchingsToRemove)):
-                matchings.pop(matchingsToRemove[i])
-            for i in range(len(edgesAtoB)):
-                newMatch = edgesAtoB[i]
-                matched[newMatch[0]] = 1
-                matched[newMatch[1]] = 1
-            matchings += (edgesAtoB)
+            updateMatchings(matchings, matched, edgesAtoB)
+    
     return ([], [], matchings, True, False)
 
+def updateMatchings(matchings, matched, edgesAtoB):
+    matchingsToRemove = []
+    for i in range(len(edgesAtoB)):
+        for j in range(len(matchings)):
+            if matchings[j][0] == edgesAtoB[i][0]:
+                matchingsToRemove.append(j)
+                oldMatch = matchings[j]
+                matched[oldMatch[1]] = 0
+    matchingsToRemove.sort(reverse=True)
+    for i in range(len(matchingsToRemove)):
+        matchings.pop(matchingsToRemove[i])
+    for i in range(len(edgesAtoB)):
+        newMatch = edgesAtoB[i]
+        matched[newMatch[0]] = 1
+        matched[newMatch[1]] = 1
+    matchings += (edgesAtoB)
+            
 def getMatchings(A, matchings, matched, adjacencyMatrix):
     for i in range(len(A)):
         originNode = i
@@ -222,7 +226,7 @@ edgeWeights = np.array(edgeWeights, dtype=float)
 
 yVector = np.zeros(2 * N)
 
-yVector[:] = 0
+yVector[:] = min(edgeWeights)/2
 
 adjacencyMatrixOfG = getAdjacencyMatrix(incidenceMatrix)
 
