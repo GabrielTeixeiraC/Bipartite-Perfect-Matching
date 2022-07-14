@@ -226,7 +226,7 @@ edgeWeights = np.array(edgeWeights, dtype=float)
 
 yVector = np.zeros(2 * N)
 
-yVector[:] = min(edgeWeights)/2
+yVector[:] = 0
 
 adjacencyMatrixOfG = getAdjacencyMatrix(incidenceMatrix)
 
